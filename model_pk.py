@@ -15,6 +15,7 @@ class PopMusicTransformer(object):
         self.dictionary_path = '{}/dictionary.pkl'.format(checkpoint)
         self.event2word, self.word2event = pickle.load(open(self.dictionary_path, 'rb'))
         # model settings
+        self.group_size = 5
         self.x_len = 512
         self.mem_len = 512
         self.n_layer = 12
@@ -33,12 +34,12 @@ class PopMusicTransformer(object):
         else:
             self.batch_size = 1
         self.checkpoint_path = '{}/model'.format(checkpoint)
-        self.load_model()
+        self.load_model(is_training)
 
     ########################################
     # load model
     ########################################
-    def load_model(self):
+    def load_model(self, is_training):
         # placeholders
         self.x = tf.compat.v1.placeholder(tf.int32, shape=[self.batch_size, None])
         self.y = tf.compat.v1.placeholder(tf.int32, shape=[self.batch_size, None])
@@ -96,7 +97,10 @@ class PopMusicTransformer(object):
         config = tf.compat.v1.ConfigProto(allow_soft_placement=True)
         config.gpu_options.allow_growth = True
         self.sess = tf.compat.v1.Session(config=config)
-        # self.saver.restore(self.sess, self.checkpoint_path)
+        if is_training:
+            self.sess.run(tf.global_variables_initializer())
+        else:
+            self.saver.restore(self.sess, self.checkpoint_path)
 
     ########################################
     # temperature sampling
@@ -270,6 +274,9 @@ class PopMusicTransformer(object):
     ########################################
     def finetune(self, training_data, output_checkpoint_folder):
         # shuffle
+        # tf.compat.v1.global_variables_initializer()
+        # with tf.Session() as sess:
+        #     sess.run(tf.compat.v1.global_variables_initializer())
         index = np.arange(len(training_data))
         np.random.shuffle(index)
         training_data = training_data[index]

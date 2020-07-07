@@ -11,5 +11,5 @@ Thumbs.db
 result/*
 data/*
 REMI-tempo-checkpoint/*
-REMI-tempo-checkpoint_pk/*
+REMI-tempo-checkpoint-pk/*
 pickle/*
