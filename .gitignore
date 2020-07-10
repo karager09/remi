@@ -13,3 +13,4 @@ data/*
 REMI-tempo-checkpoint/*
 REMI-tempo-checkpoint-pk/*
 pickle/*
+REMI-*

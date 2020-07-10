@@ -7,12 +7,13 @@ os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 def main():
     # declare model
     model = PopMusicTransformer(
-        checkpoint='REMI-tempo-checkpoint',
+        checkpoint='REMI-finetune-pk',
+        load_weights=False,
         is_training=True)
     # prepare data
     # midi_paths = glob('YOUR PERSOANL FOLDER/*.midi') # you need to revise it
     # training_data = model.prepare_data(midi_paths=midi_paths)
-    with open(r'pickle/training_data_4_4_classical_pickle', 'rb') as file:
+    with open(r'pickle/training_data_4_4_len256_classical_pickle_filtered_2from3ins_0,1err', 'rb') as file:
         training_data = pickle.load(file)
 
     # check output checkpoint folder
@@ -23,7 +24,7 @@ def main():
     # if use "REMI-tempo-checkpoint"
     # for example: my-love, cute-doggy, ...
     ####################################
-    output_checkpoint_folder = 'REMI-finetune-pk' # your decision
+    output_checkpoint_folder = 'REMI-finetune-pk-len256-2from3ins_0,1err' # your decision
     if not os.path.exists(output_checkpoint_folder):
         os.mkdir(output_checkpoint_folder)
     

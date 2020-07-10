@@ -3,21 +3,23 @@ import numpy as np
 import miditoolkit
 import modules
 import pickle
-import utils
+import utils_pk
 import time
 
 class PopMusicTransformer(object):
     ########################################
     # initialize
     ########################################
-    def __init__(self, checkpoint, is_training=False):
+    def __init__(self, checkpoint, load_weights=True, is_training=False):
         # load dictionary
         self.dictionary_path = '{}/dictionary.pkl'.format(checkpoint)
         self.event2word, self.word2event = pickle.load(open(self.dictionary_path, 'rb'))
         # model settings
         self.group_size = 5
-        self.x_len = 512
-        self.mem_len = 512
+        self.x_len = 256
+        self.mem_len = 256
+        # self.x_len = 512
+        # self.mem_len = 512
         self.n_layer = 12
         self.d_embed = 512
         self.d_model = 512
@@ -30,16 +32,16 @@ class PopMusicTransformer(object):
         # load model
         self.is_training = is_training
         if self.is_training:
-            self.batch_size = 4
+            self.batch_size = 2
         else:
             self.batch_size = 1
-        self.checkpoint_path = '{}/model'.format(checkpoint)
-        self.load_model(is_training)
+        self.checkpoint_path = '{}/model-009-0.932'.format(checkpoint)
+        self.load_model(load_weights, is_training)
 
     ########################################
     # load model
     ########################################
-    def load_model(self, is_training):
+    def load_model(self, load_weights, is_training):
         # placeholders
         self.x = tf.compat.v1.placeholder(tf.int32, shape=[self.batch_size, None])
         self.y = tf.compat.v1.placeholder(tf.int32, shape=[self.batch_size, None])
@@ -93,14 +95,14 @@ class PopMusicTransformer(object):
         optimizer = tf.compat.v1.train.AdamOptimizer(learning_rate=decay_lr)
         self.train_op = optimizer.apply_gradients(grads_and_vars, self.global_step)
         # saver
-        self.saver = tf.compat.v1.train.Saver()
+        self.saver = tf.compat.v1.train.Saver(max_to_keep=5)
         config = tf.compat.v1.ConfigProto(allow_soft_placement=True)
         config.gpu_options.allow_growth = True
         self.sess = tf.compat.v1.Session(config=config)
-        if is_training:
-            self.sess.run(tf.global_variables_initializer())
-        else:
+        if load_weights:
             self.saver.restore(self.sess, self.checkpoint_path)
+        else:
+            self.sess.run(tf.global_variables_initializer())
 
     ########################################
     # temperature sampling
@@ -123,16 +125,16 @@ class PopMusicTransformer(object):
     # extract events for prompt continuation
     ########################################
     def extract_events(self, input_path):
-        note_items, tempo_items = utils.read_items(input_path)
-        note_items = utils.quantize_items(note_items)
+        note_items, tempo_items = utils_pk.read_items(input_path)
+        note_items = utils_pk.quantize_items(note_items)
         max_time = note_items[-1].end
         if 'chord' in self.checkpoint_path:
-            chord_items = utils.extract_chords(note_items)
+            chord_items = utils_pk.extract_chords(note_items)
             items = chord_items + tempo_items + note_items
         else:
             items = tempo_items + note_items
-        groups = utils.group_items(items, max_time)
-        events = utils.item2event(groups)
+        groups = utils_pk.group_items(items, max_time)
+        events = utils_pk.item2event(groups)
         return events
 
     ########################################
@@ -202,13 +204,13 @@ class PopMusicTransformer(object):
             batch_m = _new_mem
         # write
         if prompt:
-            utils.write_midi(
+            utils_pk.write_midi(
                 words=words[0][original_length:],
                 word2event=self.word2event,
                 output_path=output_path,
                 prompt_path=prompt)
         else:
-            utils.write_midi(
+            utils_pk.write_midi(
                 words=words[0],
                 word2event=self.word2event,
                 output_path=output_path,
@@ -282,7 +284,8 @@ class PopMusicTransformer(object):
         training_data = training_data[index]
         num_batches = len(training_data) // self.batch_size
         st = time.time()
-        for e in range(200):
+        # bylo 200
+        for e in range(50):
             total_loss = []
             for i in range(num_batches):
                 segments = training_data[self.batch_size*i:self.batch_size*(i+1)]
