@@ -6,7 +6,8 @@ def main():
     print("Starting..")
     # declare model
     model = PopMusicTransformer(
-        checkpoint='REMI-finetune-pk-len256-2',
+        checkpoint='REMI-finetune-pk-len256-2from3ins_0,1err',
+        model_name="model-022-0.570",
         is_training=False)
     print("Loading complete")
 

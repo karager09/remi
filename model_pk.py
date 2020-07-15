@@ -10,8 +10,9 @@ class PopMusicTransformer(object):
     ########################################
     # initialize
     ########################################
-    def __init__(self, checkpoint, load_weights=True, is_training=False):
+    def __init__(self, checkpoint, model_name="", is_training=False):
         # load dictionary
+        tf.compat.v1.reset_default_graph()
         self.dictionary_path = '{}/dictionary.pkl'.format(checkpoint)
         self.event2word, self.word2event = pickle.load(open(self.dictionary_path, 'rb'))
         # model settings
@@ -35,13 +36,13 @@ class PopMusicTransformer(object):
             self.batch_size = 2
         else:
             self.batch_size = 1
-        self.checkpoint_path = '{}/model-009-0.932'.format(checkpoint)
-        self.load_model(load_weights, is_training)
+        self.checkpoint_path = '{}/{}'.format(checkpoint, model_name)
+        self.load_model(model_name, is_training)
 
     ########################################
     # load model
     ########################################
-    def load_model(self, load_weights, is_training):
+    def load_model(self, model_name, is_training):
         # placeholders
         self.x = tf.compat.v1.placeholder(tf.int32, shape=[self.batch_size, None])
         self.y = tf.compat.v1.placeholder(tf.int32, shape=[self.batch_size, None])
@@ -99,7 +100,7 @@ class PopMusicTransformer(object):
         config = tf.compat.v1.ConfigProto(allow_soft_placement=True)
         config.gpu_options.allow_growth = True
         self.sess = tf.compat.v1.Session(config=config)
-        if load_weights:
+        if model_name != "":
             self.saver.restore(self.sess, self.checkpoint_path)
         else:
             self.sess.run(tf.global_variables_initializer())
