@@ -9,6 +9,7 @@ MIN_DURATION = 1/8
 DEFAULT_VELOCITY_BINS = np.linspace(0, 128, 32+1, dtype=np.int)
 DEFAULT_DURATION_BINS = np.arange(0, 4.01, MIN_DURATION, dtype=float)
 DEFAULT_TEMPO_INTERVALS = [range(30, 90), range(90, 150), range(150, 210)]
+# od 0-11, zmienia sie co 5
 
 # parameters for output
 DEFAULT_RESOLUTION = 480
@@ -110,6 +111,8 @@ def group_items(items, max_time, ticks_per_beat, time_signature_changes=None):
     downbeats = []
     for time_signature, next_time_signature in zip(time_signature_changes, (time_signature_changes + [None])[1:]):
         quarter_per_bar =  int(4 / time_signature.denominator * time_signature.numerator)
+        if quarter_per_bar == 0:
+            quarter_per_bar = 1
         start_time = int(time_signature.time / ticks_per_beat)
         if next_time_signature != None:
             end_time = int(next_time_signature.time / ticks_per_beat)
@@ -211,21 +214,21 @@ def item2event(groups):
                 if tempo in DEFAULT_TEMPO_INTERVALS[0]:
                     tempo_style = Event('Tempo Class', item.start, 'slow', None)
                     tempo_value = Event('Tempo Value', item.start, 
-                        tempo-DEFAULT_TEMPO_INTERVALS[0].start, None)
+                        (tempo-DEFAULT_TEMPO_INTERVALS[0].start) // 5, None)
                 elif tempo in DEFAULT_TEMPO_INTERVALS[1]:
                     tempo_style = Event('Tempo Class', item.start, 'mid', None)
                     tempo_value = Event('Tempo Value', item.start, 
-                        tempo-DEFAULT_TEMPO_INTERVALS[1].start, None)
+                        (tempo-DEFAULT_TEMPO_INTERVALS[1].start) // 5, None)
                 elif tempo in DEFAULT_TEMPO_INTERVALS[2]:
                     tempo_style = Event('Tempo Class', item.start, 'fast', None)
                     tempo_value = Event('Tempo Value', item.start, 
-                        tempo-DEFAULT_TEMPO_INTERVALS[2].start, None)
+                        (tempo-DEFAULT_TEMPO_INTERVALS[2].start) // 5, None)
                 elif tempo < DEFAULT_TEMPO_INTERVALS[0].start:
                     tempo_style = Event('Tempo Class', item.start, 'slow', None)
                     tempo_value = Event('Tempo Value', item.start, 0, None)
                 elif tempo > DEFAULT_TEMPO_INTERVALS[2].stop:
                     tempo_style = Event('Tempo Class', item.start, 'fast', None)
-                    tempo_value = Event('Tempo Value', item.start, 59, None)
+                    tempo_value = Event('Tempo Value', item.start, 11, None)
                 events.append(tempo_style)
                 events.append(tempo_value)     
     return events
@@ -236,7 +239,7 @@ def item2event(groups):
 def make_map():
     list_of_events = []
     list_of_events.append('Bar_None')
-    for i in range(1, 7):
+    for i in range(1, 9):
         list_of_events.append(f'Position Bar_{i}')
     for i in range(1, 9):
         list_of_events.append(f'Position Quarter_{i}/8')
@@ -248,7 +251,7 @@ def make_map():
         list_of_events.append(f'Note On_{i}')
     for i in ['slow', 'mid', 'fast']:
         list_of_events.append(f'Tempo Class_{i}')
-    for i in range(0, 60):
+    for i in range(0, 12):
         list_of_events.append(f'Tempo Value_{i}')
     # list_of_events
     iterator = 1
@@ -330,11 +333,11 @@ def write_midi(words, word2event, output_path, prompt_path=None):
             position_in_quarter = int(events[i+1].value.split('/')[0]) - 1
             position = position_in_bar + position_in_quarter * MIN_DURATION
             if events[i+2].value == 'slow':
-                tempo = DEFAULT_TEMPO_INTERVALS[0].start + int(events[i+3].value)
+                tempo = DEFAULT_TEMPO_INTERVALS[0].start + int(events[i+3].value) * 5
             elif events[i+2].value == 'mid':
-                tempo = DEFAULT_TEMPO_INTERVALS[1].start + int(events[i+3].value)
+                tempo = DEFAULT_TEMPO_INTERVALS[1].start + int(events[i+3].value) * 5
             elif events[i+2].value == 'fast':
-                tempo = DEFAULT_TEMPO_INTERVALS[2].start + int(events[i+3].value)
+                tempo = DEFAULT_TEMPO_INTERVALS[2].start + int(events[i+3].value) * 5
             temp_tempos.append([position, tempo])
     # get specific time for notes
     notes = []

@@ -13,8 +13,9 @@ class PopMusicTransformer(object):
     def __init__(self, checkpoint, model_name="", is_training=False):
         # load dictionary
         tf.compat.v1.reset_default_graph()
-        self.dictionary_path = '{}/dictionary.pkl'.format(checkpoint)
-        self.event2word, self.word2event = pickle.load(open(self.dictionary_path, 'rb'))
+        # self.dictionary_path = '{}/dictionary.pkl'.format(checkpoint)
+        # self.event2word, self.word2event = pickle.load(open(self.dictionary_path, 'rb'))
+        self.event2word, self.word2event = utils_pk.make_map()
         # model settings
         self.group_size = 5
         self.x_len = 256
@@ -126,7 +127,11 @@ class PopMusicTransformer(object):
     # extract events for prompt continuation
     ########################################
     def extract_events(self, input_path):
-        note_items, tempo_items = utils_pk.read_items(input_path)
+        midi_obj = miditoolkit.midi.parser.MidiFile(input_path)
+        ticks_per_beat = midi_obj.ticks_per_beat
+        time_signature_changes = midi_obj.time_signature_changes
+
+        note_items, tempo_items = utils_pk.read_items(midi_obj)
         note_items = utils_pk.quantize_items(note_items)
         max_time = note_items[-1].end
         if 'chord' in self.checkpoint_path:
@@ -134,7 +139,7 @@ class PopMusicTransformer(object):
             items = chord_items + tempo_items + note_items
         else:
             items = tempo_items + note_items
-        groups = utils_pk.group_items(items, max_time)
+        groups = utils_pk.group_items(items, max_time, ticks_per_beat, time_signature_changes=time_signature_changes)
         events = utils_pk.item2event(groups)
         return events
 
@@ -163,7 +168,8 @@ class PopMusicTransformer(object):
                 else:
                     tempo_classes = [v for k, v in self.event2word.items() if 'Tempo Class' in k]
                     tempo_values = [v for k, v in self.event2word.items() if 'Tempo Value' in k]
-                    ws.append(self.event2word['Position_1/16'])
+                    ws.append(self.event2word['Position Bar_1'])
+                    ws.append(self.event2word['Position Quarter_1/16'])
                     ws.append(np.random.choice(tempo_classes))
                     ws.append(np.random.choice(tempo_values))
                 words.append(ws)
@@ -233,26 +239,32 @@ class PopMusicTransformer(object):
         all_words = []
         for events in all_events:
             words = []
-            for event in events:
-                e = '{}_{}'.format(event.name, event.value)
-                if e in self.event2word:
-                    words.append(self.event2word[e])
-                else:
-                    # OOV
-                    if event.name == 'Note Velocity':
-                        # replace with max velocity based on our training data
-                        words.append(self.event2word['Note Velocity_21'])
+            try:
+                for event in events:
+                    e = '{}_{}'.format(event.name, event.value)
+                    if e in self.event2word:
+                        words.append(self.event2word[e])
                     else:
-                        # something is wrong
-                        # you should handle it for your own purpose
-                        e_lower = '{}_{}'.format(event.name, event.value-1)
-                        e_higher = '{}_{}'.format(event.name, event.value+1)
-                        if e_lower in self.event2word:
-                            words.append(self.event2word[e_lower])
-                        elif e_higher in self.event2word:
-                            words.append(self.event2word[e_higher])
+                        # OOV
+                        if event.name == 'Note Velocity':
+                            # replace with max velocity based on our training data
+                            words.append(self.event2word['Note Velocity_128'])
+                        elif event.name == "Position Bar" and int(event.value) > 8:
+                            raise Exception("Too high meter.")
                         else:
-                            print('something is wrong! {}'.format(e))
+                            # something is wrong
+                            # you should handle it for your own purpose
+                                e_lower = '{}_{}'.format(event.name, event.value-1)
+                                e_higher = '{}_{}'.format(event.name, event.value+1)
+                                if e_lower in self.event2word:
+                                    words.append(self.event2word[e_lower])
+                                elif e_higher in self.event2word:
+                                    words.append(self.event2word[e_higher])
+            except Exception as e:
+                if event.name == "Position Bar":
+                    print(f"AGAIN")
+                print(f'ERROR: {path}, Exception: {e}, Event: {event}')
+                continue
             all_words.append(words)
         # to training data
         self.group_size = 5
