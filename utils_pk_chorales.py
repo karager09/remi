@@ -32,8 +32,7 @@ def read_items(midi_obj):
     ticks_per_beat = midi_obj.ticks_per_beat
     # note
     note_items = []
-    for i in range(0, max(MAX_VOICE, len(midi_obj.instruments))):
-
+    for i in range(0, min(MAX_VOICE, len(midi_obj.instruments))):
         notes = midi_obj.instruments[i].notes
         for note in notes:
             note_items.append(Item(

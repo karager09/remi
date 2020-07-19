@@ -6,6 +6,8 @@ import pickle
 import utils_pk_chorales as utils_pk
 import time
 
+TRANSPONE = [-3, -2, -1, 0, 1, 2, 3]
+
 class PopMusicTransformer(object):
     ########################################
     # initialize
@@ -232,7 +234,19 @@ class PopMusicTransformer(object):
         for path in midi_paths:
             try:
                 events = self.extract_events(path)
-                all_events.append(events)
+                for trans in TRANSPONE:
+                    transponed_events = []
+                    for event in events:
+                        if event.name == 'Note On':
+                            new_event = utils_pk.Event(
+                                name='Note On',
+                                time=event.time, 
+                                value=int(event.value + trans),
+                                text='{}'.format(event.text))
+                            transponed_events.append(new_event)
+                        else:
+                            transponed_events.append(event)
+                    all_events.append(transponed_events)
             except Exception as e:
                 print(f'ERROR: {path}, Exception: {e}')
         # event to word
@@ -250,20 +264,11 @@ class PopMusicTransformer(object):
                             # replace with max velocity based on our training data
                             words.append(self.event2word['Note Velocity_128'])
                         elif event.name == "Position Bar" and int(event.value) > 8:
-                            raise Exception("Too high meter.")
+                            raise Exception(f"Too high meter.")
                         else:
-                            # something is wrong
-                            # you should handle it for your own purpose
-                                e_lower = '{}_{}'.format(event.name, event.value-1)
-                                e_higher = '{}_{}'.format(event.name, event.value+1)
-                                if e_lower in self.event2word:
-                                    words.append(self.event2word[e_lower])
-                                elif e_higher in self.event2word:
-                                    words.append(self.event2word[e_higher])
+                            raise Exception(f"Not known event.")
             except Exception as e:
-                if event.name == "Position Bar":
-                    print(f"AGAIN")
-                print(f'ERROR: {path}, Exception: {e}, Event: {event}')
+                print(f'Exception: {e}, Event: {event}')
                 continue
             all_words.append(words)
         # to training data
