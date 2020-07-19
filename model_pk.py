@@ -3,7 +3,7 @@ import numpy as np
 import miditoolkit
 import modules
 import pickle
-import utils_pk
+import utils_pk_chorales as utils_pk
 import time
 
 class PopMusicTransformer(object):
@@ -298,6 +298,10 @@ class PopMusicTransformer(object):
         num_batches = len(training_data) // self.batch_size
         st = time.time()
         # bylo 200
+        epoch_list = []
+        gs_list = []
+        loss_list = []
+        time_list = []
         for e in range(50):
             total_loss = []
             for i in range(num_batches):
@@ -312,9 +316,19 @@ class PopMusicTransformer(object):
                         feed_dict[m] = m_np
                     # run
                     _, gs_, loss_, new_mem_ = self.sess.run([self.train_op, self.global_step, self.avg_loss, self.new_mem], feed_dict=feed_dict)
+                    if gs_ % 50 == 0:
+                        epoch_list.append(e)
+                        gs_list.append(gs_)
+                        loss_list.append(loss_)
+                        time_list.append(time.time()-st)
+
                     batch_m = new_mem_
                     total_loss.append(loss_)
                     print('>>> Epoch: {}, Step: {}, Loss: {:.5f}, Time: {:.2f}'.format(e, gs_, loss_, time.time()-st))
+                    if gs_ % 1000 == 0:
+                        self.saver.save(self.sess, '{}/model-{:03d}-{}-{:.3f}'.format(output_checkpoint_folder, e, gs_, np.mean(total_loss)))
+                        with open('{}/learning_curve'.format(output_checkpoint_folder), 'wb+') as file:
+                            pickle.dump((epoch_list, gs_list, loss_list, time_list), file)
             self.saver.save(self.sess, '{}/model-{:03d}-{:.3f}'.format(output_checkpoint_folder, e, np.mean(total_loss)))
             # stop
             if np.mean(total_loss) <= 0.1:

@@ -254,7 +254,7 @@ def make_map():
     for i in range(0, 12):
         list_of_events.append(f'Tempo Value_{i}')
     # list_of_events
-    iterator = 1
+    iterator = 0
     event2word = {}
     word2event = {}
     for name in list_of_events:
