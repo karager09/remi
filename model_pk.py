@@ -3,7 +3,7 @@ import numpy as np
 import miditoolkit
 import modules
 import pickle
-import utils_pk_chorales as utils_pk
+import utils_pk as utils_pk
 import time
 
 TRANSPONE = [-3, -2, -1, 0, 1, 2, 3]
@@ -150,10 +150,14 @@ class PopMusicTransformer(object):
     ########################################
     def generate(self, n_target_bar, temperature, topk, output_path, prompt=None):
         # if prompt, load it. Or, random start
+        how_many_events = 50
         if prompt:
             events = self.extract_events(prompt)
-            words = [[self.event2word['{}_{}'.format(e.name, e.value)] for e in events]]
-            words[0].append(self.event2word['Bar_None'])
+            words = [[]]
+            for i in range(0, how_many_events):
+                if i < len(events):
+                    e = events[i]
+                    words[0].append(self.event2word['{}_{}'.format(e.name, e.value)])
         else:
             words = []
             for _ in range(self.batch_size):
@@ -168,12 +172,13 @@ class PopMusicTransformer(object):
                     ws.append(np.random.choice(tempo_classes))
                     ws.append(np.random.choice(tempo_values))
                 else:
-                    tempo_classes = [v for k, v in self.event2word.items() if 'Tempo Class' in k]
-                    tempo_values = [v for k, v in self.event2word.items() if 'Tempo Value' in k]
-                    ws.append(self.event2word['Position Bar_1'])
-                    ws.append(self.event2word['Position Quarter_1/16'])
-                    ws.append(np.random.choice(tempo_classes))
-                    ws.append(np.random.choice(tempo_values))
+                    # tempo_classes = [v for k, v in self.event2word.items() if 'Tempo Class' in k]
+                    # tempo_values = [v for k, v in self.event2word.items() if 'Tempo Value' in k]
+                    # ws.append(self.event2word['Position Bar_1'])
+                    # ws.append(self.event2word['Position Quarter_1/16'])
+                    # ws.append(np.random.choice(tempo_classes))
+                    # ws.append(np.random.choice(tempo_values))
+                    pass
                 words.append(ws)
         # initialize mem
         batch_m = [np.zeros((self.mem_len, self.batch_size, self.d_model), dtype=np.float32) for _ in range(self.n_layer)]
@@ -212,18 +217,11 @@ class PopMusicTransformer(object):
             # re-new mem
             batch_m = _new_mem
         # write
-        if prompt:
-            utils_pk.write_midi(
-                words=words[0][original_length:],
-                word2event=self.word2event,
-                output_path=output_path,
-                prompt_path=prompt)
-        else:
-            utils_pk.write_midi(
-                words=words[0],
-                word2event=self.word2event,
-                output_path=output_path,
-                prompt_path=None)
+        utils_pk.write_midi(
+            words=words[0],
+            word2event=self.word2event,
+            output_path=output_path,
+            prompt_path=None)
 
     ########################################
     # prepare training data
