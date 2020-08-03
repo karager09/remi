@@ -3,7 +3,7 @@ import numpy as np
 import miditoolkit
 import modules
 import pickle
-import utils_pk as utils_pk
+import utils_pk_chorales as utils_pk
 import time
 
 TRANSPONE = [-3, -2, -1, 0, 1, 2, 3]
@@ -148,10 +148,35 @@ class PopMusicTransformer(object):
     ########################################
     # generate
     ########################################
-    def generate(self, n_target_bar, temperature, topk, output_path, prompt=None):
+    def generate(self, n_target_bar, temperature, topk, output_path, prompt=None, generate_voice=None):
         # if prompt, load it. Or, random start
         how_many_events = 50
-        if prompt:
+        events_without_voices = None
+        if generate_voice is not None:
+            meter = 0
+            current_position = 1
+            last_generated_position = [1, 1]
+            events = self.extract_events(prompt)
+            events_without_voices = []
+            for i in range(len(events)-3):
+                if events[i].name == 'Bar':
+                    events_without_voices.append(events[i])
+                elif events[i].name == 'Position Bar' and \
+                    events[i+1].name == 'Position Quarter' and \
+                    events[i+2].name == 'Note On' and \
+                    events[i+3].name == 'Note Duration' and \
+                    events[i+4].name == 'Note Voice':
+                    if meter < int(events[i].value):
+                        meter = int(events[i].value)
+                    if events[i+4].value not in generate_voice:
+                        events_without_voices.append(events[i])
+                        events_without_voices.append(events[i+1])
+                        events_without_voices.append(events[i+2])
+                        events_without_voices.append(events[i+3])
+                        events_without_voices.append(events[i+4])
+            # print(events_without_voices, meter)
+            # return
+        if prompt and generate_voice is None:
             events = self.extract_events(prompt)
             words = [[]]
             for i in range(0, how_many_events):
@@ -188,7 +213,15 @@ class PopMusicTransformer(object):
         current_generated_bar = 0
         while current_generated_bar < n_target_bar:
             # input
-            if initial_flag:
+            if generate_voice is not None:
+                # TODO resetowanie?
+                # batch_m = [np.zeros((self.mem_len, self.batch_size, self.d_model), dtype=np.float32) for _ in range(self.n_layer)]
+                original_length = len(words[0])
+                temp_x = np.zeros((self.batch_size, original_length))
+                for b in range(self.batch_size):
+                    for z, t in enumerate(words[b]):
+                        temp_x[b][z] = t
+            elif initial_flag:
                 temp_x = np.zeros((self.batch_size, original_length))
                 for b in range(self.batch_size):
                     for z, t in enumerate(words[b]):
@@ -210,12 +243,70 @@ class PopMusicTransformer(object):
                 logits=_logit, 
                 temperature=temperature,
                 topk=topk)
-            words[0].append(word)
-            # if bar event (only work for batch_size=1)
-            if word == self.event2word['Bar_None']:
-                current_generated_bar += 1
-            # re-new mem
-            batch_m = _new_mem
+
+            print(f'Gen: {utils_pk.word_to_event([int(word)], self.word2event)[0]},\t\tCurr {events_without_voices[current_position]},\t\t {events_without_voices[current_position+1]}')
+
+            if generate_voice is not None:
+                generated_event = utils_pk.word_to_event([int(word)], self.word2event)[0]
+                add_from_original = False
+                if generated_event.name == 'Position Bar':
+                    last_generated_position[0] = int(generated_event.value)
+                    words[0].append(word)
+                elif generated_event.name == 'Position Quarter':
+                    last_generated_position[1] = int(generated_event.value.split('/')[0])
+                    words[0].append(word)
+                elif generated_event.name == 'Note On' or generated_event.name == 'Note Duration':
+                    words[0].append(word)
+                elif generated_event.name == 'Bar':
+                    add_from_original = True
+                elif generated_event.name == 'Note Voice':
+                    if int(generated_event.value) in generate_voice:
+                        if events_without_voices[current_position].name == 'Position Bar':
+                            # czy position wykracza
+                            if (int(events_without_voices[current_position].value) < last_generated_position[0] or 
+                                            (int(events_without_voices[current_position].value) == last_generated_position[0]
+                                            and int(events_without_voices[current_position+1].value.split('/')[0]) < last_generated_position[1])):
+                                words[0] = words[0][:-4]
+                                add_from_original = True
+                            else:
+                                # re-new mem
+                                batch_m = _new_mem
+                                words[0].append(word)
+                        elif events_without_voices[current_position].name == 'Bar':
+                            if last_generated_position[0] <= meter:
+                                # re-new mem
+                                batch_m = _new_mem
+                                words[0].append(word)
+                            else:
+                                words[0] = words[0][:-4]
+                                add_from_original = True 
+                    else:
+                        words[0] = words[0][:-4]
+                        add_from_original = True
+                else:
+                    print(f'FOKIN MISTAKE {generate_voice}')
+                
+                if add_from_original and current_position < len(events_without_voices):
+                    if events_without_voices[current_position].name == 'Bar':
+                        words[0].append(self.event2word['Bar_None'])
+                        current_generated_bar += 1
+                        current_position += 1
+                    elif events_without_voices[current_position].name == 'Position Bar':
+                        words[0].append(self.event2word['{}_{}'.format(events_without_voices[current_position].name, events_without_voices[current_position].value)])
+                        words[0].append(self.event2word['{}_{}'.format(events_without_voices[current_position+1].name, events_without_voices[current_position+1].value)])
+                        words[0].append(self.event2word['{}_{}'.format(events_without_voices[current_position+2].name, events_without_voices[current_position+2].value)])
+                        words[0].append(self.event2word['{}_{}'.format(events_without_voices[current_position+3].name, events_without_voices[current_position+3].value)])
+                        words[0].append(self.event2word['{}_{}'.format(events_without_voices[current_position+4].name, events_without_voices[current_position+4].value)])
+                        current_position += 5
+                # print(words[0])
+            else:
+                words[0].append(word)
+                
+                # if bar event (only work for batch_size=1)
+                if word == self.event2word['Bar_None']:
+                    current_generated_bar += 1
+                # re-new mem
+                batch_m = _new_mem
         # write
         utils_pk.write_midi(
             words=words[0],
