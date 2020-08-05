@@ -244,7 +244,7 @@ class PopMusicTransformer(object):
                 temperature=temperature,
                 topk=topk)
 
-            print(f'Gen: {utils_pk.word_to_event([int(word)], self.word2event)[0]},\t\tCurr {events_without_voices[current_position]},\t\t {events_without_voices[current_position+1]}')
+            # print(f'Gen: {utils_pk.word_to_event([int(word)], self.word2event)[0]},\t\tCurr {events_without_voices[current_position]},\t\t {events_without_voices[current_position+1]}')
 
             if generate_voice is not None:
                 generated_event = utils_pk.word_to_event([int(word)], self.word2event)[0]
@@ -270,12 +270,12 @@ class PopMusicTransformer(object):
                                 add_from_original = True
                             else:
                                 # re-new mem
-                                batch_m = _new_mem
+                                # batch_m = _new_mem
                                 words[0].append(word)
                         elif events_without_voices[current_position].name == 'Bar':
                             if last_generated_position[0] <= meter:
                                 # re-new mem
-                                batch_m = _new_mem
+                                # batch_m = _new_mem
                                 words[0].append(word)
                             else:
                                 words[0] = words[0][:-4]
@@ -291,6 +291,7 @@ class PopMusicTransformer(object):
                         words[0].append(self.event2word['Bar_None'])
                         current_generated_bar += 1
                         current_position += 1
+                        print(f'Next bar {current_generated_bar}')
                     elif events_without_voices[current_position].name == 'Position Bar':
                         words[0].append(self.event2word['{}_{}'.format(events_without_voices[current_position].name, events_without_voices[current_position].value)])
                         words[0].append(self.event2word['{}_{}'.format(events_without_voices[current_position+1].name, events_without_voices[current_position+1].value)])
